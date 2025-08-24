@@ -11,7 +11,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let sample_rate = 44_100;
 
     // generate lesson text
-    let morse_text = lesson::lesson_text(2);
+    let morse_text = lesson::lesson_text(4);
 
     // get Morse map
     let map = morse::morse_map();
@@ -28,7 +28,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     // play
-    let stream = rodio::stream::OutputStreamBuilder::open_default_stream()?;
+    let mut stream = rodio::stream::OutputStreamBuilder::open_default_stream()?;
+    stream.log_on_drop(false);
     let sink = Sink::connect_new(&stream.mixer());
     let source = audio.to_source(samples);
     sink.append(source);
