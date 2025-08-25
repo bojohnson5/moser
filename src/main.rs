@@ -10,16 +10,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let tone_freq = 600.0;
     let sample_rate = 44_100;
 
-    // generate lesson text
     let morse_text = lesson::lesson_text(4);
 
-    // get Morse map
     let map = morse::morse_map();
 
-    // prepare audio builder
     let audio = audio::MorseAudio::new(wpm, tone_freq, sample_rate);
 
-    // build full sequence
     let mut samples: Vec<f32> = Vec::new();
     for ch in morse_text.chars() {
         if let Some(code) = map.get(&ch) {
@@ -27,7 +23,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     }
 
-    // play
     let mut stream = rodio::stream::OutputStreamBuilder::open_default_stream()?;
     stream.log_on_drop(false);
     let sink = Sink::connect_new(&stream.mixer());

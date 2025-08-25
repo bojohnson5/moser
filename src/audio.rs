@@ -1,6 +1,5 @@
 use rodio::buffer::SamplesBuffer;
 
-/// Generate sine wave samples in range [-1.0, 1.0]
 pub fn sine_wave_samples(freq: f32, duration_sec: f32, sample_rate: usize) -> Vec<f32> {
     let sample_count = (duration_sec * sample_rate as f32) as usize;
     (0..sample_count)
@@ -11,7 +10,6 @@ pub fn sine_wave_samples(freq: f32, duration_sec: f32, sample_rate: usize) -> Ve
         .collect()
 }
 
-/// Container for Morse audio pieces (dot, dash, gaps)
 pub struct MorseAudio {
     pub dit: Vec<f32>,
     pub dah: Vec<f32>,
@@ -39,7 +37,6 @@ impl MorseAudio {
         }
     }
 
-    /// Convert a morse string (e.g., "-.-") into audio samples
     pub fn morse_to_audio(&self, morse_str: &str) -> Vec<f32> {
         let mut out = Vec::new();
         if morse_str == " " {
@@ -53,7 +50,6 @@ impl MorseAudio {
                 }
                 out.extend(&self.gap1);
             }
-            // replace last gap1 with gap3
             if out.len() >= self.gap1.len() {
                 out.truncate(out.len() - self.gap1.len());
                 out.extend(&self.gap3);
@@ -62,7 +58,6 @@ impl MorseAudio {
         out
     }
 
-    /// Wrap final Vec<f32> in a rodio SamplesBuffer
     pub fn to_source(&self, samples: Vec<f32>) -> SamplesBuffer {
         SamplesBuffer::new(1, self.sample_rate as u32, samples)
     }
