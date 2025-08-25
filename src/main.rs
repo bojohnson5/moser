@@ -1,11 +1,17 @@
 mod audio;
 mod lesson;
 mod morse;
+mod scores;
 
 use rodio::Sink;
-use std::io::{self, Write};
+use scores::ScoreData;
+use std::{
+    cmp::min,
+    io::{self, Write},
+};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let mut scores: ScoreData = confy::load("morse", None)?;
     let wpm = 15;
     let tone_freq = 600.0;
     let sample_rate = 44_100;
@@ -36,6 +42,20 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     println!("\nYou entered: {}", user_input.trim());
     println!("Expected:   {}", morse_text);
+
+    let mut correct_chars = 0;
+    for i in 0..min(user_input.len(), morse_text.len()) {
+        if user_input.get(i..i + 1) == morse_text.get(i..i + 1) {
+            correct_chars += 1;
+        }
+    }
+    let accuracy = (correct_chars * 100 / morse_text.len()) as u32;
+    scores
+        .lessons
+        .entry(current_lesson as u8)
+        .or_default()
+        .push(accuracy);
+    confy::store("moser", None, &scores)?;
 
     sink.sleep_until_end();
     Ok(())
