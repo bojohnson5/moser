@@ -4,6 +4,7 @@ mod morse;
 mod scores;
 
 use clap::Parser;
+use morse::KOCH_SEQUENCE;
 use rodio::Sink;
 use scores::ScoreData;
 use strsim::levenshtein;
@@ -95,7 +96,6 @@ fn main() -> Result<(), Box<dyn Error>> {
 
             // Lesson details
             let lesson_num = app.selected + 1;
-            let lesson_text = lesson::lesson_text(lesson_num); // implement to show which letters
             let history = app
                 .scores
                 .lessons
@@ -109,9 +109,9 @@ fn main() -> Result<(), Box<dyn Error>> {
                 .join(", ");
 
             let details_text = format!(
-                "Lesson {}\nLetters: {}\nLast scores: {}\n\nPress <q> to quit",
+                "Lesson {}\nLetters: {:?}\nLast scores: {}\n\nPress <q> to quit",
                 lesson_num,
-                lesson_text,
+                &KOCH_SEQUENCE[..lesson_num],
                 if history.is_empty() {
                     "None".into()
                 } else {
