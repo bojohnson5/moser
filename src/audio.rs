@@ -17,7 +17,6 @@ pub struct MorseAudio {
     pub gap3: Vec<f32>,
     pub gap7: Vec<f32>,
     pub sample_rate: usize,
-    pub effective_wpm: u32,
 }
 
 impl MorseAudio {
@@ -39,7 +38,6 @@ impl MorseAudio {
             gap3: vec![0.0; (gap3_len * sample_rate as f32) as usize],
             gap7: vec![0.0; (gap7_len * sample_rate as f32) as usize],
             sample_rate,
-            effective_wpm,
         }
     }
 
