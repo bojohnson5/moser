@@ -18,3 +18,7 @@ pub fn lesson_text(current_lesson: usize) -> String {
 
     words.join(" ")
 }
+
+pub fn new_letters_for_lesson<'a>(lesson_num: usize) -> &'a [char] {
+    &KOCH_SEQUENCE[lesson_num - 1..lesson_num]
+}

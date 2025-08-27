@@ -17,15 +17,20 @@ pub struct MorseAudio {
     pub gap3: Vec<f32>,
     pub gap7: Vec<f32>,
     pub sample_rate: usize,
+    pub effective_wpm: u32,
 }
 
 impl MorseAudio {
-    pub fn new(wpm: u32, tone_freq: f32, sample_rate: usize) -> Self {
-        let dit_len = 1200.0 / wpm as f32 / 1000.0;
+    pub fn new(wpm: u32, effective_wpm: u32, tone_freq: f32, sample_rate: usize) -> Self {
+        let dit_len = 1.2 / wpm as f32;
         let dah_len = 3.0 * dit_len;
-        let gap1_len = dit_len;
-        let gap3_len = 3.0 * dit_len;
-        let gap7_len = 7.0 * dit_len;
+
+        let standard_word_time = 50.0 * dit_len;
+        let effective_word_time = 60.0 / effective_wpm as f32;
+        let stretch = (effective_word_time / standard_word_time).max(1.0);
+        let gap1_len = dit_len * stretch;
+        let gap3_len = 3.0 * dit_len * stretch;
+        let gap7_len = 7.0 * dit_len * stretch;
 
         Self {
             dit: sine_wave_samples(tone_freq, dit_len, sample_rate),
@@ -34,6 +39,7 @@ impl MorseAudio {
             gap3: vec![0.0; (gap3_len * sample_rate as f32) as usize],
             gap7: vec![0.0; (gap7_len * sample_rate as f32) as usize],
             sample_rate,
+            effective_wpm,
         }
     }
 

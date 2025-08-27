@@ -4,7 +4,6 @@ mod morse;
 mod scores;
 
 use clap::Parser;
-use morse::KOCH_SEQUENCE;
 use rodio::Sink;
 use scores::ScoreData;
 use strsim::levenshtein;
@@ -22,13 +21,21 @@ use ratatui::{
     layout::{Constraint, Direction, Layout},
     prelude::*,
     style::{Color, Style},
-    widgets::{Block, Borders, List, ListItem, Paragraph},
+    symbols,
+    widgets::{Axis, Block, Borders, Chart, Dataset, List, ListItem, Paragraph},
 };
 
 #[derive(Parser, Debug)]
 struct Args {
-    #[arg(short, long, default_value_t = 15)]
+    /// character speed (WPM for dots/dashes)
+    #[arg(short, long, default_value_t = 20)]
     wpm: u32,
+
+    /// effective overall WPM (Farnsworth spacing)
+    #[arg(long, default_value_t = 15)]
+    effective_wpm: u32,
+
+    /// tone frequency (Hz)
     #[arg(short, long, default_value_t = 600.0)]
     tone_freq: f32,
 }
@@ -40,9 +47,14 @@ enum Mode {
 
 struct App {
     mode: Mode,
-    selected: usize,
+    selected: usize, // 0-based index into lessons
     user_input: String,
     scores: ScoreData,
+    wpm: u32,
+    effective_wpm: u32,
+    freq: f32,
+    sink: Option<rodio::Sink>,
+    stream: Option<rodio::OutputStream>,
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
@@ -52,6 +64,11 @@ fn main() -> Result<(), Box<dyn Error>> {
         selected: 0,
         user_input: String::new(),
         scores: confy::load("moser", None)?,
+        wpm: args.wpm,
+        effective_wpm: args.effective_wpm,
+        freq: args.tone_freq,
+        sink: None,
+        stream: None,
     };
 
     // TUI setup
@@ -90,33 +107,27 @@ fn main() -> Result<(), Box<dyn Error>> {
             let list = List::new(lessons).block(
                 Block::default()
                     .title("Lessons (↑/↓, Enter)")
-                    .borders(Borders::ALL),
+                    .borders(Borders::ALL)
+                    .border_style(if matches!(app.mode, Mode::PickingLesson) {
+                        Style::default().fg(Color::Cyan)
+                    } else {
+                        Style::default()
+                    }),
             );
             f.render_widget(list, top_chunks[0]);
 
-            // Lesson details
+            // Lesson details split: info + chart
+            let right_chunks = Layout::default()
+                .direction(Direction::Vertical)
+                .constraints([Constraint::Percentage(40), Constraint::Percentage(60)])
+                .split(top_chunks[1]);
+
             let lesson_num = app.selected + 1;
-            let history = app
-                .scores
-                .lessons
-                .get(&lesson_num.to_string())
-                .unwrap_or(&Vec::new())
-                .iter()
-                .rev()
-                .take(5)
-                .map(|s| format!("{}%", s))
-                .collect::<Vec<_>>()
-                .join(", ");
+            let new_chars = lesson::new_letters_for_lesson(lesson_num);
 
             let details_text = format!(
-                "Lesson {}\nLetters: {:?}\nLast scores: {}\n\nPress <q> to quit",
-                lesson_num,
-                &KOCH_SEQUENCE[..lesson_num],
-                if history.is_empty() {
-                    "None".into()
-                } else {
-                    history
-                }
+                "Lesson {}\nNew character(s): {:?}\n\nPress <q> to quit",
+                lesson_num, new_chars
             );
 
             let details = Paragraph::new(details_text)
@@ -126,11 +137,69 @@ fn main() -> Result<(), Box<dyn Error>> {
                         .borders(Borders::ALL),
                 )
                 .alignment(Alignment::Center);
-            f.render_widget(details, top_chunks[1]);
+            f.render_widget(details, right_chunks[0]);
+
+            // Chart for last scores
+            let scores_vec: Vec<u32> = app
+                .scores
+                .lessons
+                .get(&lesson_num.to_string())
+                .unwrap_or(&Vec::new())
+                .iter()
+                .rev()
+                .take(10)
+                .cloned()
+                .collect();
+            let data: Vec<(f64, f64)> = scores_vec
+                .iter()
+                .enumerate()
+                .map(|(i, s)| (i as f64, *s as f64))
+                .collect();
+
+            let datasets = vec![
+                Dataset::default()
+                    .name("Accuracy")
+                    .marker(symbols::Marker::Dot)
+                    .graph_type(ratatui::widgets::GraphType::Line)
+                    .style(Style::default().fg(Color::Green))
+                    .data(&data),
+            ];
+
+            let chart = Chart::new(datasets)
+                .block(
+                    Block::default()
+                        .title("Last Scores")
+                        .borders(Borders::ALL)
+                        .border_style(if matches!(app.mode, Mode::PickingLesson) {
+                            Style::default().fg(Color::Cyan)
+                        } else {
+                            Style::default()
+                        }),
+                )
+                .x_axis(
+                    Axis::default()
+                        .bounds([0.0, data.len().max(1) as f64])
+                        .labels(["0".into(), format!("{}", data.len())]),
+                )
+                .y_axis(
+                    Axis::default()
+                        .bounds([0.0, 100.0])
+                        .labels(["0%", "50%", "100%"]),
+                );
+            f.render_widget(chart, right_chunks[1]);
 
             // Input pane
             let input_box = Paragraph::new(app.user_input.clone())
-                .block(Block::default().title("Your Input").borders(Borders::ALL))
+                .block(
+                    Block::default()
+                        .title("Your Input")
+                        .borders(Borders::ALL)
+                        .border_style(if matches!(app.mode, Mode::TypingLesson) {
+                            Style::default().fg(Color::Cyan)
+                        } else {
+                            Style::default()
+                        }),
+                )
                 .alignment(Alignment::Center)
                 .style(Style::default().fg(Color::Green));
             f.render_widget(input_box, chunks[1]);
@@ -144,19 +213,22 @@ fn main() -> Result<(), Box<dyn Error>> {
                         Mode::PickingLesson => match key.code {
                             KeyCode::Char('q') => break, // quit
                             KeyCode::Down => {
-                                if app.selected < 35 {
-                                    app.selected += 1;
-                                }
+                                app.selected = (app.selected + 1) % 36;
                             }
                             KeyCode::Up => {
-                                if app.selected > 0 {
-                                    app.selected -= 1;
-                                }
+                                app.selected = (app.selected + 35) % 36;
                             }
                             KeyCode::Enter => {
-                                // start audio + switch to typing mode
                                 app.user_input.clear();
-                                play_lesson_audio(app.selected + 1, args.wpm, args.tone_freq)?;
+                                if let Ok((stream, sink)) = play_lesson_audio(
+                                    app.selected + 1,
+                                    app.wpm,
+                                    app.freq,
+                                    app.effective_wpm,
+                                ) {
+                                    app.stream = Some(stream);
+                                    app.sink = Some(sink);
+                                }
                                 app.mode = Mode::TypingLesson;
                             }
                             _ => {}
@@ -186,6 +258,9 @@ fn main() -> Result<(), Box<dyn Error>> {
                                 confy::store("moser", None, &app.scores)?;
                                 app.mode = Mode::PickingLesson;
                             }
+                            KeyCode::Esc => {
+                                app.mode = Mode::PickingLesson;
+                            }
                             _ => {}
                         },
                     }
@@ -201,12 +276,18 @@ fn main() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-/// Helper: play audio for a lesson
-fn play_lesson_audio(lesson_num: usize, wpm: u32, freq: f32) -> Result<(), Box<dyn Error>> {
+/// Play audio for a lesson with Farnsworth spacing
+fn play_lesson_audio(
+    lesson_num: usize,
+    wpm: u32,
+    freq: f32,
+    effective_wpm: u32,
+) -> Result<(rodio::OutputStream, rodio::Sink), Box<dyn Error>> {
     let sample_rate = 44_100;
     let morse_text = lesson::lesson_text(lesson_num);
     let map = morse::morse_map();
-    let audio = audio::MorseAudio::new(wpm, freq, sample_rate);
+
+    let audio = audio::MorseAudio::new(wpm, effective_wpm, freq, sample_rate);
 
     let mut samples: Vec<f32> = Vec::new();
     for ch in morse_text.chars() {
@@ -220,5 +301,5 @@ fn play_lesson_audio(lesson_num: usize, wpm: u32, freq: f32) -> Result<(), Box<d
     let sink = Sink::connect_new(&stream.mixer());
     let source = audio.to_source(samples);
     sink.append(source);
-    Ok(())
+    Ok((stream, sink))
 }

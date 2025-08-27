@@ -1,8 +1,8 @@
 use std::collections::HashMap;
 
 pub const KOCH_SEQUENCE: &[char] = &[
-    'K', 'M', 'R', 'S', 'U', 'A', 'P', 'T', 'L', 'O', 'W', 'I', 'N', 'J', 'E', 'F', '0', 'Y', 'V',
-    'G', '5', 'Q', '9', 'Z', 'H', '3', '8', 'B', '4', '2', '7', 'C', '1', 'D', '6', 'X',
+    'K', 'M', 'R', 'S', 'U', 'A', 'P', 'T', 'L', 'O', 'W', 'B', 'I', 'N', 'J', 'E', 'F', 'Y', 'V',
+    'C', 'D', 'X', 'G', 'Q', 'Z', 'H', '0', '5', '9', '3', '8', '4', '2', '7', '1', '6',
 ];
 
 pub fn morse_map() -> HashMap<char, &'static str> {
