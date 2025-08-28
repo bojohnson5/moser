@@ -100,17 +100,17 @@ pub fn draw_ui(f: &mut Frame, app: &mut App, total_lessons: usize) {
 
     let datasets = vec![
         Dataset::default()
-            .name("Accuracy")
-            .marker(symbols::Marker::Dot)
-            .graph_type(ratatui::widgets::GraphType::Line)
-            .style(Style::default().fg(Color::Green))
-            .data(&data),
-        Dataset::default()
             .name("90%")
             .marker(symbols::Marker::Dot)
             .graph_type(ratatui::widgets::GraphType::Line)
             .style(Style::default().fg(Color::Red))
             .data(&data2),
+        Dataset::default()
+            .name("Accuracy")
+            .marker(symbols::Marker::Dot)
+            .graph_type(ratatui::widgets::GraphType::Line)
+            .style(Style::default().fg(Color::Green))
+            .data(&data),
     ];
 
     let chart = Chart::new(datasets)
@@ -144,12 +144,12 @@ pub fn draw_ui(f: &mut Frame, app: &mut App, total_lessons: usize) {
     let display_input = format!("{}{}", app.user_input, cursor);
 
     let mut lines: Vec<Line> = Vec::new();
-    lines.push(Line::from(display_input));
 
     if let Some(spans) = &app.highlighted_results {
         lines.push(Line::from(spans.clone()));
-    } else if !matches!(app.mode, Mode::LetterPractice) {
-        lines.push(Line::from(format!("{}", app.current_practice)));
+        lines.push(Line::from(app.current_practice.clone()));
+    } else {
+        lines.push(Line::from(display_input));
     }
 
     let input_box = Paragraph::new(Text::from(lines))

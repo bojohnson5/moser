@@ -104,6 +104,7 @@ impl App {
                 KeyCode::Enter => {
                     self.user_input.clear();
                     self.current_practice.clear();
+                    self.highlighted_results = None;
                     self.current_practice = lesson::lesson_text(self.selected + 1);
                     let (stream, sink) = play_lesson_audio(
                         &self.current_practice,
