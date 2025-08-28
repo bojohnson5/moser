@@ -134,6 +134,7 @@ pub fn draw_ui(f: &mut Frame, app: &mut App, total_lessons: usize) {
                     Style::default()
                 }),
         )
+        .legend_position(None)
         .x_axis(
             Axis::default()
                 .bounds([xmin, xmax])
