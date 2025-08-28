@@ -88,15 +88,25 @@ pub fn draw_ui(f: &mut Frame, app: &mut App, total_lessons: usize) {
         .get(&lesson_num.to_string())
         .unwrap_or(&Vec::new())
         .iter()
-        .take(10)
         .cloned()
         .collect();
     let data: Vec<(f64, f64)> = scores_vec
         .iter()
         .enumerate()
+        .rev()
+        .take(10)
+        .rev()
         .map(|(i, s)| (i as f64, *s as f64))
         .collect();
-    let data2: Vec<(f64, f64)> = (0..scores_vec.len()).map(|i| (i as f64, 90.0)).collect();
+    let xmin = match data.first() {
+        Some((min, _)) => *min,
+        None => 0.0,
+    };
+    let xmax = match data.last() {
+        Some((max, _)) => *max,
+        None => 10.0,
+    };
+    let data2 = vec![(xmin, 90.0), (xmax, 90.0)];
 
     let datasets = vec![
         Dataset::default()
@@ -126,8 +136,8 @@ pub fn draw_ui(f: &mut Frame, app: &mut App, total_lessons: usize) {
         )
         .x_axis(
             Axis::default()
-                .bounds([0.0, data.len().max(1) as f64])
-                .labels(["0".into(), format!("{}", data.len())]),
+                .bounds([xmin, xmax])
+                .labels([xmin.to_string(), xmax.to_string()]),
         )
         .y_axis(
             Axis::default()
