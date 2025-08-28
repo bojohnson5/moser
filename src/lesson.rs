@@ -24,6 +24,27 @@ pub fn lesson_text(current_lesson: usize) -> String {
     words.join(" ")
 }
 
+pub fn practice_text(lesson_num: usize) -> String {
+    if lesson_num == 1 {
+        // Lesson 1 introduces K and M
+        let letters = &KOCH_SEQUENCE[0..2];
+        letters
+            .iter()
+            .map(|c| c.to_string())
+            .cycle()
+            .take(20) // total ~20 letters
+            .collect::<Vec<_>>()
+            .join(" ")
+    } else {
+        // Subsequent lessons: just the newly introduced letter
+        let new_letter = KOCH_SEQUENCE[lesson_num];
+        std::iter::repeat(new_letter.to_string())
+            .take(20)
+            .collect::<Vec<_>>()
+            .join(" ")
+    }
+}
+
 pub fn new_letters_for_lesson<'a>(lesson_num: usize) -> &'a [char] {
     if lesson_num == 1 {
         &KOCH_SEQUENCE[0..2]

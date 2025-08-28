@@ -1,4 +1,8 @@
-use rodio::buffer::SamplesBuffer;
+use std::error::Error;
+
+use rodio::{Sink, buffer::SamplesBuffer};
+
+use crate::morse;
 
 pub fn sine_wave_samples(freq: f32, duration_sec: f32, sample_rate: usize) -> Vec<f32> {
     let sample_count = (duration_sec * sample_rate as f32) as usize;
@@ -65,4 +69,30 @@ impl MorseAudio {
     pub fn to_source(&self, samples: Vec<f32>) -> SamplesBuffer {
         SamplesBuffer::new(1, self.sample_rate as u32, samples)
     }
+}
+
+pub fn play_lesson_audio(
+    lesson_text: &str,
+    wpm: u32,
+    freq: f32,
+    effective_wpm: u32,
+) -> Result<(rodio::OutputStream, rodio::Sink), Box<dyn Error>> {
+    let sample_rate = 44_100;
+    let map = morse::morse_map();
+
+    let audio = MorseAudio::new(wpm, effective_wpm, freq, sample_rate);
+
+    let mut samples: Vec<f32> = Vec::new();
+    for ch in lesson_text.chars() {
+        if let Some(code) = map.get(&ch) {
+            samples.extend(audio.morse_to_audio(code));
+        }
+    }
+
+    let mut stream = rodio::stream::OutputStreamBuilder::open_default_stream()?;
+    stream.log_on_drop(false);
+    let sink = Sink::connect_new(&stream.mixer());
+    let source = audio.to_source(samples);
+    sink.append(source);
+    Ok((stream, sink))
 }
